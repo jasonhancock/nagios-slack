@@ -1,0 +1,67 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use LWP::UserAgent;
+use JSON;
+use URI::Encode qw(uri_encode);
+
+my $nagios_url = $ARGV[0];
+my $slack_url  = $ARGV[1];
+my $channel    = $ARGV[2];
+my $botname    = $ARGV[3];
+
+my $icons = {
+    CRITICAL        => ':exclamation:',
+    WARNING         => ':warning:',
+    OK              => ':white_check_mark:',
+    UNKNOWN         => ':question:',
+    ACKNOWLEDGEMENT => ':heart:',
+};
+
+use Data::Dumper;
+open OUT, ">>/tmp/jive.txt";
+print OUT Dumper(\%ENV);
+close OUT;
+
+my $icon = $ENV{NAGIOS_NOTIFICATIONTYPE} eq 'ACKNOWLEDGEMENT'
+    ? $$icons{ACKNOWLEDGEMENT}
+    : defined($$icons{$ENV{NAGIOS_SERVICESTATE}})
+        ? $$icons{$ENV{NAGIOS_SERVICESTATE}}
+        : ':white_medium_square:';
+
+my $data = {
+    channel => $channel,
+    username => $botname,
+    text => sprintf(
+        "%s HOST: %s  SERVICE: %s  %s  <%s|See Nagios>",
+        $icon,
+        $ENV{NAGIOS_HOSTNAME},
+        $ENV{NAGIOS_SERVICEDISPLAYNAME},
+        $ENV{NAGIOS_NOTIFICATIONTYPE} eq 'ACKNOWLEDGEMENT'
+            ? sprintf(
+                'ACKNOWLEDGED BY: %s  COMMENT: %s',
+                $ENV{NAGIOS_NOTIFICATIONAUTHOR},
+                $ENV{NAGIOS_NOTIFICATIONCOMMENT}
+              )
+            : 'MESSAGE: ' . $ENV{NAGIOS_SERVICEOUTPUT},
+        uri_encode(
+            sprintf(
+                '%s/cgi-bin/status.cgi?navbarsearch=1&host=%s',
+                $nagios_url,
+                $ENV{NAGIOS_HOSTNAME}
+            ),
+            { encode_reserved => 1 }
+        )
+    ),
+};
+
+my $req = HTTP::Request->new( 'POST', $slack_url);
+$req->content( 'payload=' . encode_json($data));
+
+my $ua = LWP::UserAgent->new;
+my $resp = $ua->request( $req );
+
+if(!$resp->is_success) {
+    die(sprintf("%s: %s\n", $resp->code, $resp->message));
+}
