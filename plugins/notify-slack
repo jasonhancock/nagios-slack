@@ -19,11 +19,6 @@ my $icons = {
     ACKNOWLEDGEMENT => ':heart:',
 };
 
-use Data::Dumper;
-open OUT, ">>/tmp/jive.txt";
-print OUT Dumper(\%ENV);
-close OUT;
-
 my $icon = $ENV{NAGIOS_NOTIFICATIONTYPE} eq 'ACKNOWLEDGEMENT'
     ? $$icons{ACKNOWLEDGEMENT}
     : defined($$icons{$ENV{NAGIOS_SERVICESTATE}})
