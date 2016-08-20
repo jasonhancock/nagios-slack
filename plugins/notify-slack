@@ -45,23 +45,21 @@ my $data = {
                 $ENV{NAGIOS_NOTIFICATIONCOMMENT}
               )
             : 'MESSAGE: ' . $ENV{NAGIOS_SERVICEOUTPUT},
-        uri_encode(
-            sprintf(
-                '%s/cgi-bin/status.cgi?navbarsearch=1&host=%s',
-                $nagios_url,
-                $ENV{NAGIOS_HOSTNAME}
-            ),
-            { encode_reserved => 1 }
-        )
+        sprintf(
+            '%s/cgi-bin/status.cgi?navbarsearch=1&host=%s',
+            $nagios_url,
+            $ENV{NAGIOS_HOSTNAME}
+        ),
     ),
 };
 
 my $req = HTTP::Request->new( 'POST', $slack_url);
-$req->content( 'payload=' . encode_json($data));
+$req->header( 'Content-Type' => 'application/x-www-form-urlencoded' );
+$req->content( 'payload=' . uri_encode(encode_json($data), { encode_reserved => 1 }));
 
 my $ua = LWP::UserAgent->new;
 my $resp = $ua->request( $req );
 
 if(!$resp->is_success) {
-    die(sprintf("%s: %s\n", $resp->code, $resp->message));
+    die(sprintf("%s: %s\n\n%s\n", $resp->code, $resp->message, $resp->decoded_content));
 }
