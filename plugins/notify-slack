@@ -13,38 +13,53 @@ my $botname    = $ARGV[3];
 
 my $icons = {
     CRITICAL        => ':exclamation:',
+    DOWN            => ':exclamation:',
     WARNING         => ':warning:',
     OK              => ':white_check_mark:',
+    UP              => ':white_check_mark:',
     UNKNOWN         => ':question:',
     ACKNOWLEDGEMENT => ':heart:',
 };
 
-my $icon = $ENV{NAGIOS_NOTIFICATIONTYPE} eq 'ACKNOWLEDGEMENT'
-    ? $$icons{ACKNOWLEDGEMENT}
-    : defined($$icons{$ENV{NAGIOS_SERVICESTATE}})
-        ? $$icons{$ENV{NAGIOS_SERVICESTATE}}
-        : ':white_medium_square:';
+my $icon = ':white_medium_square:';
+my $msg = '';
+my $msg_prefix = '';
+my $type = $ENV{NAGIOS_SERVICEATTEMPT} ? 'service' : 'host';
+
+if ($type eq 'service') {
+    $icon = $$icons{$ENV{NAGIOS_SERVICESTATE}} if defined($$icons{$ENV{NAGIOS_SERVICESTATE}});
+    $msg = 'MESSAGE: ' . $ENV{NAGIOS_SERVICEOUTPUT};
+    $msg_prefix = 'SERVICE: ' . $ENV{NAGIOS_SERVICEDISPLAYNAME};
+} else {
+    $icon = $$icons{$ENV{NAGIOS_HOSTSTATE}} if defined ($ENV{NAGIOS_HOSTSTATE});
+    $msg_prefix = 'is ' . $ENV{NAGIOS_HOSTSTATE};
+}
+# override if it's an Ack
+if($ENV{NAGIOS_NOTIFICATIONTYPE} eq 'ACKNOWLEDGEMENT') {
+    $icon = $$icons{ACKNOWLEDGEMENT};
+    $msg =  sprintf(
+        'ACKNOWLEDGED BY: %s  COMMENT: %s',
+        $ENV{NAGIOS_NOTIFICATIONAUTHOR},
+        $ENV{NAGIOS_NOTIFICATIONCOMMENT}
+    );
+}
+
+my $url = sprintf(
+    '%s/cgi-bin/status.cgi?navbarsearch=1&host=%s',
+    $nagios_url,
+    $ENV{NAGIOS_HOSTNAME}
+);
 
 my $data = {
     channel => $channel,
     username => $botname,
     text => sprintf(
-        "%s HOST: %s  SERVICE: %s  %s  <%s|See Nagios>",
+        "%s HOST: %s  %s  %s  <%s|See Nagios>",
         $icon,
         $ENV{NAGIOS_HOSTNAME},
-        $ENV{NAGIOS_SERVICEDISPLAYNAME},
-        $ENV{NAGIOS_NOTIFICATIONTYPE} eq 'ACKNOWLEDGEMENT'
-            ? sprintf(
-                'ACKNOWLEDGED BY: %s  COMMENT: %s',
-                $ENV{NAGIOS_NOTIFICATIONAUTHOR},
-                $ENV{NAGIOS_NOTIFICATIONCOMMENT}
-              )
-            : 'MESSAGE: ' . $ENV{NAGIOS_SERVICEOUTPUT},
-        sprintf(
-            '%s/cgi-bin/status.cgi?navbarsearch=1&host=%s',
-            $nagios_url,
-            $ENV{NAGIOS_HOSTNAME}
-        ),
+        $msg_prefix,
+        $msg,
+        $url,
     ),
 };
 
