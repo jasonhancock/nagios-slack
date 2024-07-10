@@ -4,7 +4,7 @@ env:
   - GO111MODULE=on
 builds:
   - main: main.go
-    binary: jasongen
+    binary: nagios-slack
     goos:
       - darwin
       - linux
